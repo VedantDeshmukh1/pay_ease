@@ -23,6 +23,7 @@ def get_gemini_response(image):
     4. Identify any tip amount if present.
     5. Calculate the total bill amount.
 
+    If you can't find or calculate any of these values, use 0.00 as a placeholder.
     Provide the response in the following JSON format:
     {
         "items": [
@@ -41,22 +42,38 @@ def get_gemini_response(image):
         
         # Try to parse the response as JSON
         try:
-            return json.loads(response.text)
+            bill_data = json.loads(response.text)
         except json.JSONDecodeError:
             # If parsing fails, try to extract JSON from the response
             import re
             json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                bill_data = json.loads(json_match.group())
             else:
                 raise ValueError("Unable to extract JSON from the response")
+        
+        # Ensure all required fields are present
+        default_bill = {
+            "items": [],
+            "subtotal": 0.00,
+            "tax": 0.00,
+            "tip": 0.00,
+            "total": 0.00
+        }
+        
+        for key in default_bill:
+            if key not in bill_data:
+                bill_data[key] = default_bill[key]
+                st.warning(f"{key.capitalize()} not found. Please add it manually.")
+        
+        return bill_data
     
     except Exception as e:
         st.error(f"Error processing the image: {str(e)}")
         st.error("Raw response from Gemini:")
         st.code(response.text)
-        return None
-
+        return default_bill
+        
 def main():
     st.set_page_config(page_title="AI Bill Splitter", page_icon="💰")
     
